@@ -111,6 +111,17 @@ form input[type=color]{width:56px;height:44px;border:1px solid var(--line);borde
 .sheet button.item.on::after{content:" ✓";color:var(--accent)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(100px + var(--safe-b));background:#05070d;color:#fff;border:1px solid #1b2438;padding:11px 18px;border-radius:999px;z-index:50;font-size:14px;max-width:90%;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .scanner video{width:100%;max-height:70vh;background:#000;border-radius:12px}
+.cropwrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:8px 16px calc(24px + var(--safe-b))}
+.cropstage{position:relative;line-height:0;touch-action:none;user-select:none;-webkit-user-select:none;padding:22px}
+.cropinner{position:relative;overflow:hidden;border-radius:8px;line-height:0}
+.cropview{display:block}
+.cropframe{position:absolute;box-shadow:0 0 0 9999px rgba(5,7,13,.62);border:2px solid #fff;touch-action:none;cursor:move;border-radius:3px}
+.crophandles{position:absolute;left:22px;top:22px;pointer-events:none}
+.crophandles .hb{position:absolute}
+.crophandles i{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;touch-action:none;pointer-events:auto}
+.crophandles i::after{content:'';position:absolute;left:14px;top:14px;width:16px;height:16px;background:#fff;border-radius:50%;box-shadow:0 0 0 3px var(--accent)}
+.crophandles i[data-h=nw]{left:0;top:0}.crophandles i[data-h=n]{left:50%;top:0}.crophandles i[data-h=ne]{left:100%;top:0}.crophandles i[data-h=e]{left:100%;top:50%}
+.crophandles i[data-h=se]{left:100%;top:100%}.crophandles i[data-h=s]{left:50%;top:100%}.crophandles i[data-h=sw]{left:0;top:100%}.crophandles i[data-h=w]{left:0;top:50%}
 .hidden{display:none!important}
 </style>
 </head>
@@ -391,7 +402,7 @@ const WCodes = (() => {
 /* =====================================================================
    OtterCards – App
    ===================================================================== */
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const $ = (s, el = document) => el.querySelector(s);
 function h(tag, props, ...kids) {
   const e = document.createElement(tag);
@@ -620,6 +631,85 @@ function scaledCanvas(bmp, max) {
   const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w0 * s)); cv.height = Math.max(1, Math.round(h0 * s));
   cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
   return cv;
+}
+/* ---------- Foto zuschneiden ---------- */
+// Liefert eine Canvas mit dem gewählten Ausschnitt (volle Auflösung) oder null bei Abbruch.
+function cropPhoto(src) {
+  return new Promise(resolve => {
+    const W0 = src.width || src.naturalWidth, H0 = src.height || src.naturalHeight;
+    let rot = 0, work = null, r = { x: .04, y: .04, w: .92, h: .92 };   // Rahmen als Anteil (0–1) des Bildes
+    const mkWork = () => {
+      const k = Math.min(1, 4096 / Math.max(W0, H0)), w = Math.round(W0 * k), hh = Math.round(H0 * k);
+      const sw = rot % 180 ? hh : w, sh = rot % 180 ? w : hh;
+      const c = document.createElement('canvas'); c.width = sw; c.height = sh;
+      const x = c.getContext('2d'); x.translate(sw / 2, sh / 2); x.rotate(rot * Math.PI / 180); x.drawImage(src, -w / 2, -hh / 2, w, hh);
+      return c;
+    };
+    const view = h('canvas', { class: 'cropview' });
+    const frame = h('div', { class: 'cropframe' });
+    const box = h('div', { class: 'hb' }, ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(k => h('i', { 'data-h': k })));
+    const stage = h('div', { class: 'cropstage' }, h('div', { class: 'cropinner' }, view, frame), h('div', { class: 'crophandles' }, box));
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    function layout() {
+      const aw = Math.min(window.innerWidth - 32 - 44, 640), ah = window.innerHeight - 290;
+      const k = Math.min(aw / work.width, Math.max(120, ah) / work.height);
+      const dw = Math.max(80, Math.round(work.width * k)), dh = Math.max(80, Math.round(work.height * k));
+      view.style.width = dw + 'px'; view.style.height = dh + 'px';
+      const pv = Math.min(1, 1400 / Math.max(work.width, work.height));
+      view.width = Math.round(work.width * pv); view.height = Math.round(work.height * pv);
+      view.getContext('2d').drawImage(work, 0, 0, view.width, view.height);
+      place();
+    }
+    function place() {
+      const dw = view.clientWidth, dh = view.clientHeight;
+      const st = { left: r.x * dw + 'px', top: r.y * dh + 'px', width: r.w * dw + 'px', height: r.h * dh + 'px' };
+      Object.assign(frame.style, st); Object.assign(box.style, st);
+    }
+    let drag = null;
+    stage.addEventListener('pointerdown', e => {
+      if (e.target !== frame && !e.target.dataset.h) return;
+      drag = { k: e.target.dataset.h || 'move', x: e.clientX, y: e.clientY, o: { ...r } };
+      try { stage.setPointerCapture(e.pointerId); } catch {}
+      e.preventDefault();
+    });
+    stage.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const dw = view.clientWidth, dh = view.clientHeight, dx = (e.clientX - drag.x) / dw, dy = (e.clientY - drag.y) / dh, o = drag.o, k = drag.k;
+      const mx = Math.min(.5, 48 / dw), my = Math.min(.5, 48 / dh);
+      let { x, y, w, h: hh } = o;
+      if (k === 'move') { x = clamp(o.x + dx, 0, 1 - o.w); y = clamp(o.y + dy, 0, 1 - o.h); }
+      else {
+        if (k.includes('w')) { x = clamp(o.x + dx, 0, o.x + o.w - mx); w = o.w + (o.x - x); }
+        if (k.includes('e')) w = clamp(o.w + dx, mx, 1 - o.x);
+        if (k.includes('n')) { y = clamp(o.y + dy, 0, o.y + o.h - my); hh = o.h + (o.y - y); }
+        if (k.includes('s')) hh = clamp(o.h + dy, my, 1 - o.y);
+      }
+      r = { x, y, w, h: hh }; place();
+    });
+    const end = () => { drag = null; };
+    stage.addEventListener('pointerup', end); stage.addEventListener('pointercancel', end);
+    const onResize = () => layout();
+    const done = v => { window.removeEventListener('resize', onResize); ov.remove(); resolve(v); };
+    const apply = () => {
+      const sx = Math.round(r.x * work.width), sy = Math.round(r.y * work.height), sw = Math.max(1, Math.round(r.w * work.width)), sh = Math.max(1, Math.round(r.h * work.height));
+      const c = document.createElement('canvas'); c.width = sw; c.height = sh;
+      c.getContext('2d').drawImage(work, sx, sy, sw, sh, 0, 0, sw, sh); done(c);
+    };
+    const ov = h('div', { class: 'overlay', role: 'dialog' },
+      h('div', { class: 'bar' },
+        h('button', { type: 'button', class: 'textbtn', onclick: () => done(null) }, 'Abbrechen'),
+        h('h2', {}, 'Zuschneiden'),
+        h('button', { type: 'button', class: 'textbtn', id: 'crop-ok', onclick: apply }, 'Fertig')),
+      h('div', { class: 'cropwrap' },
+        h('div', { class: 'hint', style: 'text-align:center;margin:0' }, 'Ziehe den Rahmen und die Punkte so, dass nur die Karte bleibt.'),
+        stage,
+        h('div', { class: 'actions', style: 'width:100%;max-width:420px' },
+          h('button', { type: 'button', class: 'btn', id: 'crop-rot', onclick: () => { rot = (rot + 90) % 360; work = mkWork(); r = { x: .04, y: .04, w: .92, h: .92 }; layout(); } }, '↻ Drehen'),
+          h('button', { type: 'button', class: 'btn', id: 'crop-all', onclick: () => done(work) }, 'Ganzes Foto'))));
+    document.body.append(ov);
+    window.addEventListener('resize', onResize);
+    work = mkWork(); layout();
+  });
 }
 async function processPhoto(file, max = 1280) {
   const bmp = await loadBitmap(file);
@@ -888,7 +978,11 @@ function openEditor(card) {
     input.value = ''; input.onchange = async () => {
       const f = input.files && input.files[0]; if (!f) return;
       let photo;
-      try { photo = await processPhoto(f); } catch (e) { toast('Foto konnte nicht verarbeitet werden.', 4000); return; }
+      try {
+        const bmp = await loadBitmap(f), cv = await cropPhoto(bmp);
+        if (!cv) return;
+        photo = { dataUrl: scaledCanvas(cv, 1280).toDataURL('image/jpeg', 0.82), source: cv };
+      } catch (e) { toast('Foto konnte nicht verarbeitet werden.', 4000); return; }
       d.photo = photo.dataUrl; d.design = 'photo'; ocrCands = []; draw();
       toast('Foto gespeichert – suche nach Code …', 8000);
       let hit = null, scannerOk = true, scanErr = null;
@@ -911,7 +1005,7 @@ function openEditor(card) {
         h('button', { type: 'button', class: 'btn', onclick: () => pickFile($('#fileLibrary')) }, '🖼 Aus Mediathek'),
         h('button', { type: 'button', class: 'btn', onclick: () => openScanner(hit => { const note = applyDetected(d, hit); draw(); toast(note || 'Code gescannt.', note ? 6500 : 2600); }) }, '⌖ Live scannen')),
       h('div', { class: 'hint' }, 'Tipp: Foto der Karte machen oder live scannen – Barcode bzw. QR-Code wird automatisch gelesen.'),
-      d.photo && h('div', { class: 'photo-prev' }, h('img', { src: d.photo, alt: 'Kartenfoto' }), h('div', { style: 'display:flex;flex-direction:column;align-items:flex-start' }, h('button', { type: 'button', class: 'textbtn', onclick: async () => { toast('Lese Zahlen im Foto …', 20000); const img = new Image(); img.src = d.photo; try { await img.decode(); } catch {} await findNumbers(img, null); } }, '🔢 Zahl im Foto suchen'), h('button', { type: 'button', class: 'textbtn danger', onclick: () => { d.photo = ''; d.design = 'color'; ocrCands = []; draw(); } }, 'Foto entfernen')))));
+      d.photo && h('div', { class: 'photo-prev' }, h('img', { src: d.photo, alt: 'Kartenfoto' }), h('div', { style: 'display:flex;flex-direction:column;align-items:flex-start' }, h('button', { type: 'button', class: 'textbtn', onclick: async () => { toast('Lese Zahlen im Foto …', 20000); const img = new Image(); img.src = d.photo; try { await img.decode(); } catch {} await findNumbers(img, null); } }, '🔢 Zahl im Foto suchen'), h('button', { type: 'button', class: 'textbtn', onclick: async () => { const img = new Image(); img.src = d.photo; try { await img.decode(); } catch {} const cv = await cropPhoto(img); if (cv) { d.photo = scaledCanvas(cv, 1280).toDataURL('image/jpeg', 0.82); draw(); } } }, '✂ Zuschneiden'), h('button', { type: 'button', class: 'textbtn danger', onclick: () => { d.photo = ''; d.design = 'color'; ocrCands = []; draw(); } }, 'Foto entfernen')))));
     root.append(h('div', { class: 'field' }, h('label', { for: 'f-name' }, 'Name'), h('input', { id: 'f-name', type: 'text', value: d.name, placeholder: 'z. B. dm, Rewe, Payback', autocomplete: 'off', oninput: e => d.name = e.target.value })));
     root.append(h('div', { class: 'field' }, h('label', { for: 'f-num' }, 'Nummer / Inhalt'), h('input', { id: 'f-num', type: 'text', value: d.number, inputmode: 'text', autocomplete: 'off', oninput: e => { d.number = e.target.value; preview(); } }),
       ocrCands.length > 0 && h('div', { class: 'hint' }, 'Im Foto gelesene Zahlen – zum Übernehmen antippen:'),
