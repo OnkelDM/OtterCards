@@ -11,13 +11,14 @@ Kundenkarten digital im Handy. Läuft komplett im Browser, alle Daten bleiben lo
 | `manifest.json` | Name, Farben und Icons für den Home-Bildschirm |
 | `sw.js` | Service Worker: macht die App offline nutzbar |
 | `icon-*.png`, `apple-touch-icon.png` | App-Icons |
+| `vendor/` | Code-Erkennung (ZXing als WebAssembly, MIT-Lizenz), Lizenztexte in `vendor/LICENSES.txt` |
 
 Lokal ausprobieren: `index.html` einfach im Browser öffnen (Offline-Modus und Installation brauchen HTTPS, siehe unten).
 
 ## Veröffentlichen mit GitHub Pages (kostenlos)
 
 1. Auf github.com ein neues Repository anlegen (z. B. `ottercards`).
-2. Alle Dateien aus diesem Ordner hochladen („Add file → Upload files“).
+2. Alle Dateien aus diesem Ordner hochladen (**inklusive Ordner `vendor`**, aber ohne `node_modules` und `package.json`) („Add file → Upload files“).
 3. Im Repository: **Settings → Pages → Source: „Deploy from a branch“ → Branch `main`, Ordner `/ (root)` → Save**.
 4. Nach ca. einer Minute ist die App unter `https://<dein-name>.github.io/ottercards/` erreichbar.
 5. Diesen Link an die gewünschten Personen schicken.
@@ -45,14 +46,17 @@ gelöscht oder „Website-Daten“ gelöscht werden oder das Handy gewechselt wi
 ## Updates ausliefern
 
 1. Dateien ändern und hochladen.
-2. In `sw.js` die Versionsnummer in `CACHE = 'ottercards-v1.0.0'` erhöhen (z. B. `v1.0.1`).
+2. In `sw.js` die Versionsnummer in `CACHE = 'ottercards-v1.1.0'` erhöhen (z. B. `v1.1.1`).
 3. Die Geräte holen sich die neue Version beim nächsten Start (ggf. App einmal schließen und neu öffnen).
 
 ## Was geht, was nicht
 
 - Barcodes/QR-Codes werden ohne Fremdbibliothek erzeugt: QR, Code 128, EAN-13, EAN-8, UPC-A, Code 39, ITF.
-- Automatische Code-Erkennung (Foto und Live-Scanner) nutzt die `BarcodeDetector`-API des Browsers.
-  Sie ist in Chrome/Android vorhanden, in Safari auf dem iPhone meist nicht. Dort: Foto machen, Nummer abtippen.
+- Automatische Code-Erkennung (Foto und Live-Scanner) läuft komplett im Browser mit ZXing (Ordner `vendor/`),
+  auch auf dem iPhone und offline. Beim ersten Gebrauch wird die Erkennung geladen (ca. 1 MB, danach zwischengespeichert).
+  Erkannt werden QR, Code 128, EAN-13, EAN-8, UPC-A, Code 39 und ITF. Andere Typen (z. B. UPC-E, Data Matrix, PDF417)
+  werden gelesen, die Nummer wird übernommen und als Text angezeigt.
+  Für gute Treffer: Karte gerade, scharf, ohne Spiegelung und der Code sollte mindestens ein Viertel der Bildbreite füllen.
 - Kein automatisches Zuschneiden der Karte, keine automatische Helligkeit (Webseiten dürfen das nicht).
 - „Logo von Webseite laden“ fragt einen Favicon-Dienst ab (Google, ersatzweise DuckDuckGo).
   Das ist optional und der einzige Moment, in dem die App etwas ins Internet sendet.
