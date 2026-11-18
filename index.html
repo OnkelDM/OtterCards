@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>OtterCards</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="OtterCards">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{
+  --bg:#f3f4f6; --fg:#111827; --muted:#6b7280; --panel:#ffffff; --line:#e5e7eb;
+  --accent:#0f766e; --accent-fg:#ffffff; --danger:#b91c1c; --radius:14px;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#0b0f14; --fg:#f3f4f6; --muted:#9ca3af; --panel:#161c24; --line:#273041; --accent:#14b8a6; --accent-fg:#04201d; --danger:#f87171; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.app{max-width:720px;margin:0 auto;min-height:100%;padding-bottom:calc(96px + var(--safe-b))}
+header.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + var(--safe-t)) 16px 10px;display:flex;gap:10px;align-items:center}
+header.top h1{font-size:26px;margin:0;flex:1;letter-spacing:-.5px}
+.iconbtn{border:0;background:var(--panel);width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:20px;box-shadow:0 0 0 1px var(--line)}
+.search{padding:0 16px 8px}
+.search input{width:100%;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel)}
+.banner{margin:6px 16px;padding:12px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--line);display:flex;gap:10px;align-items:center;font-size:14px}
+.banner p{margin:0;flex:1}
+.banner button{border:0;background:transparent;color:var(--accent);font-weight:600;padding:6px}
+.section-h{padding:14px 20px 4px;font-size:13px;font-weight:700;color:var(--muted)}
+.rows{margin:0 16px;background:var(--panel);border-radius:var(--radius);overflow:hidden;border:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line);width:100%;background:transparent;border-left:0;border-right:0;border-top:0;text-align:left}
+.row:last-child{border-bottom:0}
+.row .tile{width:58px;height:37px;border-radius:7px;flex:none;font-size:11px}
+.row .name{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .chev{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:8px 16px}
+@media(min-width:560px){.grid{grid-template-columns:repeat(3,1fr)}}
+.grid .face{width:100%;border:0}
+.face{position:relative;aspect-ratio:1.586;border-radius:12px;overflow:hidden;display:grid;place-items:center;background-size:cover;background-position:center;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.face img.logo{max-width:46%;max-height:46%;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));background:rgba(255,255,255,.92);padding:6px;border-radius:8px}
+.face .label{position:absolute;left:10px;right:10px;bottom:8px;font-weight:700;font-size:14px;text-shadow:0 1px 3px rgba(0,0,0,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.face .initial{font-size:22px;font-weight:800;opacity:.9}
+.face.dark .label{color:#111;text-shadow:none}
+.face.dark{color:#111}
+.tile .label{display:none}
+.tile img.logo{padding:2px;border-radius:4px}
+.tile .initial{font-size:16px}
+.empty{text-align:center;color:var(--muted);padding:56px 28px}
+.empty h2{color:var(--fg);margin:0 0 8px}
+.fab{position:fixed;right:max(18px,calc(50% - 342px));bottom:calc(20px + var(--safe-b));width:60px;height:60px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-fg);font-size:32px;line-height:1;box-shadow:0 6px 18px rgba(0,0,0,.35);z-index:6}
+.overlay{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;-webkit-overflow-scrolling:touch}
+.overlay .bar{position:sticky;top:0;background:var(--bg);display:flex;align-items:center;gap:8px;padding:calc(10px + var(--safe-t)) 12px 10px;z-index:2}
+.overlay .bar h2{flex:1;margin:0;font-size:18px;text-align:center}
+.textbtn{border:0;background:transparent;color:var(--accent);font-weight:600;padding:8px 10px;font-size:16px}
+.textbtn.danger{color:var(--danger)}
+.content{padding:6px 16px calc(40px + var(--safe-b));max-width:640px;margin:0 auto}
+.detail .face{width:100%;margin-bottom:16px}
+.codebox{background:#fff;color:#000;border-radius:var(--radius);padding:18px 14px;text-align:center}
+.codebox svg{display:block;width:100%;height:auto;max-height:46vh}
+.codebox .num{font:600 20px/1.3 ui-monospace,Menlo,Consolas,monospace;margin-top:10px;word-break:break-all;letter-spacing:1px}
+.codebox.k-qr svg{max-width:min(100%,380px);margin:0 auto}
+.meta{margin:14px 2px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:4px}
+.meta a{color:var(--accent)}
+.actions{display:flex;gap:10px;margin-top:14px}
+.btn{flex:1;border:1px solid var(--line);background:var(--panel);padding:12px 14px;border-radius:12px;font-weight:600}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+.btn.danger{color:var(--danger)}
+.btn:disabled{opacity:.5}
+form .field{margin:14px 0}
+form label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:0 0 5px 2px}
+form input[type=text],form input[type=url],form input[type=search],form select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel)}
+form input[type=color]{width:56px;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:2px}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;padding:9px 6px;border-radius:9px;font-weight:600;font-size:14px}
+.seg button.on{background:var(--accent);color:var(--accent-fg)}
+.seg button:disabled{opacity:.4}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 140px}
+.photo-prev{margin-top:10px;display:flex;gap:10px;align-items:center}
+.photo-prev img{width:96px;aspect-ratio:1.586;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.hint{font-size:13px;color:var(--muted);margin:6px 2px}
+.err{color:var(--danger);font-size:13px;margin:6px 2px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:520px;background:var(--panel);border-radius:18px 18px 0 0;padding:14px 14px calc(14px + var(--safe-b))}
+.sheet h3{margin:4px 6px 8px;font-size:17px}
+.sheet p{margin:4px 6px 10px;color:var(--muted);font-size:14px;white-space:pre-line}
+.sheet button.item{display:block;width:100%;text-align:left;border:0;background:transparent;padding:14px 8px;font-size:16px;border-top:1px solid var(--line)}
+.sheet button.item.danger{color:var(--danger)}
+.sheet button.item.on::after{content:" ✓";color:var(--accent)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(100px + var(--safe-b));background:#111827;color:#fff;padding:10px 16px;border-radius:12px;z-index:50;font-size:14px;max-width:90%;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.scanner video{width:100%;max-height:70vh;background:#000;border-radius:12px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<input type="file" id="fileCamera" accept="image/*" capture="environment" class="hidden">
+<input type="file" id="fileLibrary" accept="image/*" class="hidden">
+<input type="file" id="fileImport" accept=".json,application/json" class="hidden">
+
+<script>
+/* =====================================================================
+   OtterCards – Codes erzeugen (QR, Code 128, EAN-13/8, UPC-A, Code 39, ITF)
+   Alles ohne externe Bibliotheken.
+   ===================================================================== */
+const WCodes = (() => {
+  /* ---------- QR-Code ---------- */
+  const ECC = {
+    L: { bits: 1,
+      ecc:    [-1,7,10,15,20,26,18,20,24,30,18,20,24,26,30,22,24,28,30,28,28,28,28,30,30,26,28,30,30,30,30,30,30,30,30,30,30,30,30,30,30],
+      blocks: [-1,1,1,1,1,1,2,2,2,2,4,4,4,4,4,6,6,6,6,7,8,8,9,9,10,12,12,12,13,14,15,16,17,18,19,19,20,21,22,24,25] },
+    M: { bits: 0,
+      ecc:    [-1,10,16,26,18,24,16,18,22,22,26,30,22,22,24,24,28,28,26,26,26,26,28,28,28,28,28,28,28,28,28,28,28,28,28,28,28,28,28,28,28],
+      blocks: [-1,1,1,1,2,2,4,4,4,5,5,5,8,9,9,10,10,11,13,14,16,17,17,18,20,21,23,25,26,28,29,31,33,35,37,38,40,43,45,47,49] },
+  };
+  const bit = (x, i) => ((x >>> i) & 1) !== 0;
+  function mulGF(x, y) { let z = 0; for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; } return z; }
+  function rsDivisor(deg) {
+    const r = new Array(deg).fill(0); r[deg - 1] = 1; let root = 1;
+    for (let i = 0; i < deg; i++) { for (let j = 0; j < deg; j++) { r[j] = mulGF(r[j], root); if (j + 1 < deg) r[j] ^= r[j + 1]; } root = mulGF(root, 2); }
+    return r;
+  }
+  function rsRemainder(data, div) {
+    const r = div.map(() => 0);
+    for (const b of data) { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= mulGF(c, f); }); }
+    return r;
+  }
+  function rawModules(ver) {
+    let r = (16 * ver + 128) * ver + 64;
+    if (ver >= 2) { const n = Math.floor(ver / 7) + 2; r -= (25 * n - 10) * n - 55; if (ver >= 7) r -= 36; }
+    return r;
+  }
+  function alignPositions(ver) {
+    if (ver === 1) return [];
+    const n = Math.floor(ver / 7) + 2, size = ver * 4 + 17;
+    const step = ver === 32 ? 26 : Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2;
+    const res = [6];
+    for (let pos = size - 7; res.length < n; pos -= step) res.splice(1, 0, pos);
+    return res;
+  }
+  function interleave(data, ver, E) {
+    const nb = E.blocks[ver], el = E.ecc[ver], raw = Math.floor(rawModules(ver) / 8);
+    const nShort = nb - raw % nb, shortLen = Math.floor(raw / nb);
+    const div = rsDivisor(el), blocks = [];
+    for (let i = 0, k = 0; i < nb; i++) {
+      const dat = data.slice(k, k + shortLen - el + (i < nShort ? 0 : 1)); k += dat.length;
+      const ecc = rsRemainder(dat, div);
+      if (i < nShort) dat.push(0);
+      blocks.push(dat.concat(ecc));
+    }
+    const out = [];
+    for (let i = 0; i < blocks[0].length; i++)
+      blocks.forEach((b, j) => { if (i !== shortLen - el || j >= nShort) out.push(b[i]); });
+    return out;
+  }
+  function qrMatrix(text, level = 'M') {
+    const E = ECC[level];
+    const bytes = Array.from(new TextEncoder().encode(text));
+    let ver, cap = 0;
+    for (ver = 1; ver <= 40; ver++) {
+      cap = Math.floor(rawModules(ver) / 8) - E.ecc[ver] * E.blocks[ver];
+      if (4 + (ver <= 9 ? 8 : 16) + bytes.length * 8 <= cap * 8) break;
+    }
+    if (ver > 40) throw new Error('Inhalt ist für einen QR-Code zu lang.');
+    const bits = [];
+    const push = (v, n) => { for (let i = n - 1; i >= 0; i--) bits.push((v >>> i) & 1); };
+    push(4, 4); push(bytes.length, ver <= 9 ? 8 : 16); bytes.forEach(b => push(b, 8));
+    push(0, Math.min(4, cap * 8 - bits.length));
+    push(0, (8 - bits.length % 8) % 8);
+    for (let pad = 0xEC; bits.length < cap * 8; pad ^= 0xEC ^ 0x11) push(pad, 8);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) { let v = 0; for (let j = 0; j < 8; j++) v = (v << 1) | bits[i + j]; data.push(v); }
+    const codewords = interleave(data, ver, E);
+
+    const size = ver * 4 + 17;
+    const mod = Array.from({ length: size }, () => new Array(size).fill(false));
+    const fn = Array.from({ length: size }, () => new Array(size).fill(false));
+    const setFn = (x, y, v) => { mod[y][x] = v; fn[y][x] = true; };
+    for (let i = 0; i < size; i++) { setFn(6, i, i % 2 === 0); setFn(i, 6, i % 2 === 0); }
+    const finder = (cx, cy) => {
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const d = Math.max(Math.abs(dx), Math.abs(dy)), x = cx + dx, y = cy + dy;
+        if (x >= 0 && x < size && y >= 0 && y < size) setFn(x, y, d !== 2 && d !== 4);
+      }
+    };
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+    const ap = alignPositions(ver), na = ap.length;
+    for (let i = 0; i < na; i++) for (let j = 0; j < na; j++) {
+      if ((i === 0 && j === 0) || (i === 0 && j === na - 1) || (i === na - 1 && j === 0)) continue;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++)
+        setFn(ap[i] + dx, ap[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }
+    const drawFormat = (mask) => {
+      const d = (E.bits << 3) | mask; let rem = d;
+      for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+      const b = ((d << 10) | rem) ^ 0x5412;
+      for (let i = 0; i <= 5; i++) setFn(8, i, bit(b, i));
+      setFn(8, 7, bit(b, 6)); setFn(8, 8, bit(b, 7)); setFn(7, 8, bit(b, 8));
+      for (let i = 9; i < 15; i++) setFn(14 - i, 8, bit(b, i));
+      for (let i = 0; i < 8; i++) setFn(size - 1 - i, 8, bit(b, i));
+      for (let i = 8; i < 15; i++) setFn(8, size - 15 + i, bit(b, i));
+      setFn(8, size - 8, true);
+    };
+    drawFormat(0);
+    if (ver >= 7) {
+      let rem = ver;
+      for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+      const b = (ver << 12) | rem;
+      for (let i = 0; i < 18; i++) { const c = bit(b, i), a = size - 11 + i % 3, s = Math.floor(i / 3); setFn(a, s, c); setFn(s, a, c); }
+    }
+    // Daten-Module setzen
+    let k = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert;
+        if (!fn[y][x] && k < codewords.length * 8) { mod[y][x] = bit(codewords[k >>> 3], 7 - (k & 7)); k++; }
+      }
+    }
+    const applyMask = (m) => {
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        let inv;
+        switch (m) {
+          case 0: inv = (x + y) % 2 === 0; break;
+          case 1: inv = y % 2 === 0; break;
+          case 2: inv = x % 3 === 0; break;
+          case 3: inv = (x + y) % 3 === 0; break;
+          case 4: inv = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break;
+          case 5: inv = x * y % 2 + x * y % 3 === 0; break;
+          case 6: inv = (x * y % 2 + x * y % 3) % 2 === 0; break;
+          default: inv = ((x + y) % 2 + x * y % 3) % 2 === 0;
+        }
+        if (!fn[y][x] && inv) mod[y][x] = !mod[y][x];
+      }
+    };
+    const penalty = () => {
+      let p = 0;
+      const line = (get) => {
+        for (let a = 0; a < size; a++) {
+          let run = 1, s = '';
+          for (let b = 0; b < size; b++) {
+            const v = get(a, b); s += v ? '1' : '0';
+            if (b > 0 && v === get(a, b - 1)) { run++; if (run === 5) p += 3; else if (run > 5) p++; } else run = 1;
+          }
+          const m = s.match(/(?=(00001011101|10111010000))/g); if (m) p += 40 * m.length;
+        }
+      };
+      line((r, c) => mod[r][c]); line((r, c) => mod[c][r]);
+      for (let y = 0; y < size - 1; y++) for (let x = 0; x < size - 1; x++) {
+        const c = mod[y][x]; if (c === mod[y][x + 1] && c === mod[y + 1][x] && c === mod[y + 1][x + 1]) p += 3;
+      }
+      let dark = 0; for (const r of mod) for (const c of r) if (c) dark++;
+      const tot = size * size; p += (Math.ceil(Math.abs(dark * 20 - tot * 10) / tot) - 1) * 10;
+      return p;
+    };
+    let best = 0, bestP = Infinity;
+    for (let m = 0; m < 8; m++) {
+      applyMask(m); drawFormat(m);
+      const p = penalty(); if (p < bestP) { bestP = p; best = m; }
+      applyMask(m);
+    }
+    applyMask(best); drawFormat(best);
+    return mod;
+  }
+
+  /* ---------- 1D-Barcodes (liefern Bitstring, "1" = Balken) ---------- */
+  const C128 = ['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+  const widthsToBits = (w) => { let s = '', on = true; for (const ch of w) { s += (on ? '1' : '0').repeat(+ch); on = !on; } return s; };
+  function code128(text) {
+    const isDigits = /^\d+$/.test(text) && text.length % 2 === 0 && text.length >= 4;
+    const vals = [];
+    if (isDigits) { vals.push(105); for (let i = 0; i < text.length; i += 2) vals.push(+text.substr(i, 2)); }
+    else {
+      vals.push(104);
+      for (const ch of text) { const c = ch.charCodeAt(0); if (c < 32 || c > 126) throw new Error('Code 128 unterstützt hier nur Standardzeichen (keine Umlaute/Sonderzeichen).'); vals.push(c - 32); }
+    }
+    let sum = vals[0]; for (let i = 1; i < vals.length; i++) sum += vals[i] * i;
+    vals.push(sum % 103); vals.push(106);
+    return vals.map(v => widthsToBits(C128[v])).join('');
+  }
+  const L = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+  const R = L.map(s => s.replace(/[01]/g, c => (c === '1' ? '0' : '1')));
+  const G = R.map(s => s.split('').reverse().join(''));
+  const PAR = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+  function eanCheck(digits) { // digits ohne Prüfziffer
+    let s = 0; const n = digits.length;
+    for (let i = 0; i < n; i++) s += +digits[n - 1 - i] * (i % 2 === 0 ? 3 : 1);
+    return (10 - s % 10) % 10;
+  }
+  function eanFull(text, len) {
+    if (!/^\d+$/.test(text)) throw new Error('Nur Ziffern erlaubt.');
+    if (text.length === len - 1) return text + eanCheck(text);
+    if (text.length !== len) throw new Error(`Für dieses Format sind ${len} Ziffern nötig (aktuell ${text.length}).`);
+    if (+text[len - 1] !== eanCheck(text.slice(0, -1))) throw new Error('Prüfziffer stimmt nicht.');
+    return text;
+  }
+  function ean13(text) {
+    const t = eanFull(text, 13); let s = '101';
+    for (let i = 1; i <= 6; i++) s += (PAR[+t[0]][i - 1] === 'L' ? L : G)[+t[i]];
+    s += '01010'; for (let i = 7; i <= 12; i++) s += R[+t[i]];
+    return s + '101';
+  }
+  function upca(text) { const t = eanFull(text, 12); return ean13('0' + t); }
+  function ean8(text) {
+    const t = eanFull(text, 8); let s = '101';
+    for (let i = 0; i < 4; i++) s += L[+t[i]];
+    s += '01010'; for (let i = 4; i < 8; i++) s += R[+t[i]];
+    return s + '101';
+  }
+  const C39 = { '0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn','A':'wnnnnwnnw','B':'nnwnnwnnw','C':'wnwnnwnnn','D':'nnnnwwnnw','E':'wnnnwwnnn','F':'nnwnwwnnn','G':'nnnnnwwnw','H':'wnnnnwwnn','I':'nnwnnwwnn','J':'nnnnwwwnn','K':'wnnnnnnww','L':'nnwnnnnww','M':'wnwnnnnwn','N':'nnnnwnnww','O':'wnnnwnnwn','P':'nnwnwnnwn','Q':'nnnnnnwww','R':'wnnnnnwwn','S':'nnwnnnwwn','T':'nnnnwnwwn','U':'wwnnnnnnw','V':'nwwnnnnnw','W':'wwwnnnnnn','X':'nwnnwnnnw','Y':'wwnnwnnnn','Z':'nwwnwnnnn','-':'nwnnnnwnw','.':'wwnnnnwnn',' ':'nwwnnnwnn','*':'nwnnwnwnn','$':'nwnwnwnnn','/':'nwnwnnnwn','+':'nwnnnwnwn','%':'nnnwnwnwn' };
+  function code39(text) {
+    const t = text.toUpperCase();
+    for (const ch of t) if (ch === '*' || !C39[ch]) throw new Error('Code 39 erlaubt nur A–Z, 0–9 und - . $ / + % und Leerzeichen.');
+    const seq = '*' + t + '*'; let s = '';
+    seq.split('').forEach((ch, idx) => {
+      C39[ch].split('').forEach((e, i) => { s += (i % 2 === 0 ? '1' : '0').repeat(e === 'w' ? 3 : 1); });
+      if (idx < seq.length - 1) s += '0';
+    });
+    return s;
+  }
+  const ITF = ['nnwwn','wnnnw','nwnnw','wwnnn','nnwnw','wnwnn','nwwnn','nnnww','wnnwn','nwnwn'];
+  function itf(text) {
+    if (!/^\d+$/.test(text)) throw new Error('ITF erlaubt nur Ziffern.');
+    const t = text.length % 2 ? '0' + text : text;
+    let s = '1010';
+    for (let i = 0; i < t.length; i += 2) {
+      const a = ITF[+t[i]], b = ITF[+t[i + 1]];
+      for (let j = 0; j < 5; j++) { s += '1'.repeat(a[j] === 'w' ? 3 : 1); s += '0'.repeat(b[j] === 'w' ? 3 : 1); }
+    }
+    return s + '11101';
+  }
+  const FORMATS = {
+    code128: { label: 'Code 128', fn: code128 },
+    ean13:   { label: 'EAN-13', fn: ean13 },
+    ean8:    { label: 'EAN-8', fn: ean8 },
+    upca:    { label: 'UPC-A', fn: upca },
+    code39:  { label: 'Code 39', fn: code39 },
+    itf:     { label: 'ITF (2 aus 5)', fn: itf },
+  };
+
+  /* ---------- SVG-Ausgabe ---------- */
+  function svgMatrix(m, quiet = 4) {
+    const n = m.length, w = n + quiet * 2; let d = '';
+    for (let y = 0; y < n; y++) {
+      let x = 0;
+      while (x < n) { if (m[y][x]) { let e = x; while (e < n && m[y][e]) e++; d += `M${x + quiet},${y + quiet}h${e - x}v1h${x - e}z`; x = e; } else x++; }
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${w}" shape-rendering="crispEdges"><rect width="${w}" height="${w}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+  }
+  function svgBars(bits, quiet = 10, h = 40) {
+    const w = bits.length + quiet * 2; let d = '', x = 0;
+    while (x < bits.length) { if (bits[x] === '1') { let e = x; while (e < bits.length && bits[e] === '1') e++; d += `M${x + quiet},0h${e - x}v${h}h${x - e}z`; x = e; } else x++; }
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges"><rect width="${w}" height="${h}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+  }
+  function render(display, format, text) {
+    try {
+      if (!text) throw new Error('Keine Nummer eingegeben.');
+      if (display === 'qr') return { ok: true, svg: svgMatrix(qrMatrix(text)), kind: 'qr' };
+      if (display === 'barcode') {
+        const f = FORMATS[format] || FORMATS.code128;
+        return { ok: true, svg: svgBars(f.fn(text), 10, format === 'ean13' || format === 'upca' || format === 'ean8' ? 36 : 40), kind: 'bar' };
+      }
+      return { ok: true, svg: '', kind: 'text' };
+    } catch (e) { return { ok: false, error: e.message || String(e) }; }
+  }
+  return { qrMatrix, render, FORMATS, bits: { code128, ean13, ean8, upca, code39, itf }, svgMatrix, svgBars };
+})();
+
+/* =====================================================================
+   OtterCards – App
+   ===================================================================== */
+const VERSION = '1.0.0';
+const $ = (s, el = document) => el.querySelector(s);
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v === true) e.setAttribute(k, '');
+    else e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) { if (kid == null || kid === false) continue; e.append(kid.nodeType ? kid : document.createTextNode(String(kid))); }
+  return e;
+}
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ottercards.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('ottercards.' + k, JSON.stringify(v)); } catch {} },
+};
+
+/* ---------- Datenbank (IndexedDB) ---------- */
+const DB = (() => {
+  let db;
+  const open = () => db ? Promise.resolve(db) : new Promise((res, rej) => {
+    const r = indexedDB.open('ottercards', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('cards', { keyPath: 'id' });
+    r.onsuccess = () => { db = r.result; res(db); };
+    r.onerror = () => rej(r.error);
+  });
+  const tx = (mode, fn) => open().then(d => new Promise((res, rej) => {
+    const t = d.transaction('cards', mode), r = fn(t.objectStore('cards'));
+    t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+  }));
+  return {
+    all: () => tx('readonly', s => s.getAll()),
+    put: c => tx('readwrite', s => s.put(c)),
+    putMany: l => tx('readwrite', s => { l.forEach(c => s.put(c)); }),
+    del: id => tx('readwrite', s => s.delete(id)),
+    clear: () => tx('readwrite', s => s.clear()),
+  };
+})();
+
+/* ---------- Zustand ---------- */
+let cards = [];
+let settings = { view: store.get('view', 'list') };
+let query = '';
+let bannerDismissed = false;
+
+/* ---------- Hilfen ---------- */
+function toast(msg, ms = 2600) {
+  document.querySelectorAll('.toast').forEach(e => e.remove());
+  const t = h('div', { class: 'toast', role: 'status' }, msg);
+  document.body.append(t); setTimeout(() => t.remove(), ms);
+}
+function sheet({ title, text, items }) {
+  return new Promise(resolve => {
+    const close = v => { bg.remove(); resolve(v); };
+    const bg = h('div', { class: 'sheet-bg', onclick: e => { if (e.target === bg) close(null); } },
+      h('div', { class: 'sheet', role: 'dialog' },
+        title && h('h3', {}, title), text && h('p', {}, text),
+        items.map(it => h('button', { class: 'item ' + (it.cls || ''), onclick: () => close(it.value) }, it.label))));
+    document.body.append(bg);
+  });
+}
+const confirmSheet = (title, text, yes, danger = true) =>
+  sheet({ title, text, items: [{ label: yes, value: true, cls: danger ? 'danger' : '' }, { label: 'Abbrechen', value: null }] });
+function lum(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return 0;
+  const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+function hashColor(name) {
+  let x = 0; for (const ch of name || '?') x = (x * 31 + ch.charCodeAt(0)) >>> 0;
+  const hue = x % 360, s = 0.55, l = 0.38, a = s * Math.min(l, 1 - l);
+  const f = n => { const k = (n + hue / 30) % 12; return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))).toString(16).padStart(2, '0'); };
+  return '#' + f(0) + f(8) + f(4);
+}
+function normalizeUrl(u) {
+  u = (u || '').trim(); if (!u) return '';
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(u) ? u : 'https://' + u;
+}
+const sortKey = c => (c.name || '').trim();
+const letterOf = c => { const ch = sortKey(c).charAt(0).toUpperCase().normalize('NFD').charAt(0); return /[A-Z]/.test(ch) ? ch : '#'; };
+
+/* ---------- Kartenansicht ---------- */
+function cardFace(c, small) {
+  const usePhoto = c.design === 'photo' && c.photo;
+  const color = c.color || hashColor(c.name);
+  const dark = !usePhoto && lum(color) > 0.72;
+  const face = h('div', { class: 'face' + (small ? ' tile' : '') + (dark ? ' dark' : ''), style: usePhoto ? `background-image:url("${c.photo}")` : `background:linear-gradient(135deg, ${color}, ${color}cc)` });
+  if (!usePhoto) {
+    if (c.logo) face.append(h('img', { class: 'logo', src: c.logo, alt: '' }));
+    else face.append(h('span', { class: 'initial' }, (c.name || '?').trim().charAt(0).toUpperCase()));
+    face.append(h('span', { class: 'label' }, c.name));
+  }
+  return face;
+}
+
+/* ---------- Liste ---------- */
+function visibleCards() {
+  const q = query.trim().toLowerCase();
+  return cards.filter(c => !q || (c.name || '').toLowerCase().includes(q) || (c.number || '').toLowerCase().includes(q))
+    .sort((a, b) => sortKey(a).localeCompare(sortKey(b), 'de', { sensitivity: 'base' }));
+}
+function isIosBrowser() {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  return ios && !standalone;
+}
+function backupAgeDays() { const t = store.get('lastBackup', 0); return t ? (Date.now() - t) / 86400000 : Infinity; }
+
+function renderList() {
+  const app = $('#app'); const keepSearch = document.activeElement && document.activeElement.id === 'q';
+  app.replaceChildren();
+  app.append(h('header', { class: 'top' },
+    h('h1', {}, 'OtterCards'),
+    h('button', { class: 'iconbtn', 'aria-label': 'Menü', onclick: openMenu }, '⋯')));
+  if (cards.length > 4) app.append(h('div', { class: 'search' }, h('input', { id: 'q', type: 'search', placeholder: 'Suchen …', value: query, oninput: e => { query = e.target.value; renderList(); } })));
+  // Hinweise
+  if (isIosBrowser() && !store.get('iosHintDismissed', false))
+    app.append(h('div', { class: 'banner' }, h('p', {}, 'Tipp: Tippe unten auf Teilen → „Zum Home-Bildschirm“. Nur so bleiben deine Karten dauerhaft gespeichert.'),
+      h('button', { onclick: () => { store.set('iosHintDismissed', true); renderList(); } }, 'OK')));
+  if (cards.length && backupAgeDays() > 30 && !bannerDismissed)
+    app.append(h('div', { class: 'banner' }, h('p', {}, store.get('lastBackup', 0) ? 'Dein letztes Backup ist älter als 30 Tage.' : 'Du hast noch kein Backup erstellt.'),
+      h('button', { onclick: exportBackup }, 'Backup'), h('button', { onclick: () => { bannerDismissed = true; renderList(); } }, '×')));
+  const list = visibleCards();
+  if (!cards.length) {
+    app.append(h('div', { class: 'empty' }, h('h2', {}, 'Noch keine Karten'), h('p', {}, 'Tippe auf „+“, um deine erste Kundenkarte per Foto oder von Hand hinzuzufügen.')));
+  } else if (!list.length) {
+    app.append(h('div', { class: 'empty' }, h('p', {}, 'Keine Treffer.')));
+  } else if (settings.view === 'grid') {
+    app.append(h('div', { class: 'grid' }, list.map(c => h('button', { class: 'face-btn', style: 'border:0;background:none;padding:0', onclick: () => openDetail(c.id) }, cardFace(c)))));
+  } else {
+    let cur = '';
+    for (const c of list) {
+      const l = letterOf(c);
+      if (l !== cur) { cur = l; app.append(h('div', { class: 'section-h' }, l), h('div', { class: 'rows', id: 'rows-' + l })); }
+      $('#rows-' + CSS.escape(l), app).append(h('button', { class: 'row', onclick: () => openDetail(c.id) }, cardFace(c, true), h('span', { class: 'name' }, c.name), h('span', { class: 'chev' }, '›')));
+    }
+  }
+  app.append(h('button', { class: 'fab', 'aria-label': 'Karte hinzufügen', onclick: () => openEditor() }, '+'));
+  if (keepSearch) { const q = $('#q'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }
+}
+
+/* ---------- Menü ---------- */
+async function openMenu() {
+  const v = await sheet({ title: 'OtterCards', items: [
+    { label: 'Ansicht: Liste A–Z', value: 'list', cls: settings.view === 'list' ? 'on' : '' },
+    { label: 'Ansicht: Vorschaubilder', value: 'grid', cls: settings.view === 'grid' ? 'on' : '' },
+    { label: 'Backup erstellen (Export)', value: 'export' },
+    { label: 'Backup einspielen (Import)', value: 'import' },
+    { label: 'Alle Daten löschen', value: 'wipe', cls: 'danger' },
+    { label: 'Schließen', value: null }] });
+  if (v === 'list' || v === 'grid') { settings.view = v; store.set('view', v); renderList(); }
+  else if (v === 'export') exportBackup();
+  else if (v === 'import') $('#fileImport').click();
+  else if (v === 'wipe') {
+    if (await confirmSheet('Alle Daten löschen?', 'Alle Karten werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden. Erstelle vorher ein Backup, wenn du die Karten behalten willst.', 'Alles löschen')) {
+      await DB.clear(); cards = []; renderList(); toast('Alle Daten gelöscht.');
+    }
+  }
+}
+
+/* ---------- Backup ---------- */
+async function exportBackup() {
+  if (!cards.length) { toast('Es gibt noch nichts zu sichern.'); return; }
+  const data = { app: 'ottercards', version: 1, exportedAt: new Date().toISOString(), cards };
+  const name = `ottercards-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const file = new File([JSON.stringify(data)], name, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'OtterCards-Backup' });
+    } else {
+      const url = URL.createObjectURL(file);
+      const a = h('a', { href: url, download: name }); document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }
+    store.set('lastBackup', Date.now()); bannerDismissed = true; renderList(); toast('Backup erstellt.');
+  } catch (e) { if (e && e.name !== 'AbortError') toast('Backup fehlgeschlagen: ' + (e.message || e), 5000); }
+}
+function validCard(c) {
+  return c && typeof c === 'object' && typeof c.id === 'string' && typeof c.name === 'string';
+}
+async function importBackup(file) {
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { toast('Die Datei ist kein gültiges Backup.', 4500); return; }
+  const list = data && data.app === 'ottercards' && Array.isArray(data.cards) ? data.cards.filter(validCard) : null;
+  if (!list || !list.length) { toast('Keine Karten im Backup gefunden.', 4500); return; }
+  const choice = await sheet({ title: `${list.length} ${list.length === 1 ? 'Karte' : 'Karten'} im Backup`, text: `Zusammenführen: vorhandene Karten bleiben, Karten aus dem Backup werden ergänzt bzw. überschreiben gleiche.\nErsetzen: alle jetzigen Karten (${cards.length}) werden durch das Backup ersetzt.`,
+    items: [{ label: 'Zusammenführen', value: 'merge' }, { label: 'Ersetzen', value: 'replace', cls: 'danger' }, { label: 'Abbrechen', value: null }] });
+  if (!choice) return;
+  try {
+    if (choice === 'replace') await DB.clear();
+    await DB.putMany(list);
+    cards = await DB.all(); renderList(); toast(`${list.length} ${list.length === 1 ? 'Karte' : 'Karten'} eingespielt.`);
+  } catch (e) { toast('Import fehlgeschlagen: ' + (e.message || e), 5000); }
+}
+
+/* ---------- Bilder ---------- */
+async function loadBitmap(file) {
+  try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch {}
+  try { return await createImageBitmap(file); } catch {}
+  return await new Promise((res, rej) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = u; });
+}
+async function processPhoto(file, max = 1280) {
+  const bmp = await loadBitmap(file);
+  const w0 = bmp.width || bmp.naturalWidth, h0 = bmp.height || bmp.naturalHeight, s = Math.min(1, max / Math.max(w0, h0));
+  const cv = document.createElement('canvas'); cv.width = Math.round(w0 * s); cv.height = Math.round(h0 * s);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  return { dataUrl: cv.toDataURL('image/jpeg', 0.82), source: bmp };
+}
+const hasDetector = () => 'BarcodeDetector' in window;
+const FMT_FROM_DETECTOR = { qr_code: 'qr', code_128: 'code128', ean_13: 'ean13', ean_8: 'ean8', upc_a: 'upca', code_39: 'code39', itf: 'itf' };
+async function detect(source) {
+  if (!hasDetector()) return null;
+  try {
+    const det = new BarcodeDetector();
+    const res = await det.detect(source);
+    for (const r of res) { const f = FMT_FROM_DETECTOR[r.format]; if (f && r.rawValue) return { value: r.rawValue, format: f }; }
+  } catch {}
+  return null;
+}
+function applyDetected(d, hit) {
+  d.number = hit.value;
+  if (hit.format === 'qr') d.display = 'qr'; else { d.display = 'barcode'; d.format = hit.format; }
+}
+async function fetchLogoAndColor(url) {
+  let host; try { host = new URL(normalizeUrl(url)).hostname; } catch { throw new Error('Bitte zuerst eine gültige Webseite eintragen.'); }
+  const sources = [`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`, `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`];
+  for (const src of sources) {
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = rej; i.src = src; });
+      const cv = document.createElement('canvas'); cv.width = cv.height = 96;
+      const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, 96, 96);
+      const logo = cv.toDataURL('image/png');
+      const px = ctx.getImageData(0, 0, 96, 96).data; let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        const a = px[i + 3]; if (a < 128) continue; const mx = Math.max(px[i], px[i + 1], px[i + 2]), mn = Math.min(px[i], px[i + 1], px[i + 2]);
+        if (mx - mn < 40 || mx > 245) continue; r += px[i]; g += px[i + 1]; b += px[i + 2]; n++;
+      }
+      const color = n > 20 ? '#' + [r, g, b].map(v => Math.round(v / n).toString(16).padStart(2, '0')).join('') : null;
+      return { logo, color };
+    } catch {}
+  }
+  throw new Error('Logo konnte nicht geladen werden (offline oder vom Browser blockiert). Nutze stattdessen ein Foto oder wähle eine Farbe.');
+}
+
+/* ---------- Code-Anzeige (wird in Detail & Editor genutzt) ---------- */
+function codeBox(c) {
+  const r = WCodes.render(c.display, c.format, c.number);
+  const box = h('div', { class: 'codebox k-' + (r.kind || 'x') });
+  if (!r.ok) { box.append(h('div', { class: 'num' }, c.number || '–')); return { box, error: r.error }; }
+  if (r.svg) box.insertAdjacentHTML('beforeend', r.svg);
+  if (c.number && (c.display !== 'qr' || c.number.length <= 40)) box.append(h('div', { class: 'num' }, c.number));
+  return { box };
+}
+
+/* ---------- Detailansicht ---------- */
+let wakeLock = null;
+async function keepAwake(on) {
+  try { if (on) wakeLock = await navigator.wakeLock.request('screen'); else if (wakeLock) { await wakeLock.release(); wakeLock = null; } } catch {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && $('.detail')) keepAwake(true); });
+function openDetail(id) {
+  const c = cards.find(x => x.id === id); if (!c) return;
+  const close = () => { ov.remove(); keepAwake(false); };
+  const { box, error } = codeBox(c);
+  const ov = h('div', { class: 'overlay detail', role: 'dialog' },
+    h('div', { class: 'bar' }, h('button', { class: 'textbtn', onclick: close }, '‹ Zurück'), h('h2', {}, c.name),
+      h('button', { class: 'textbtn', onclick: () => { close(); openEditor(c); } }, 'Bearbeiten')),
+    h('div', { class: 'content' }, cardFace(c), box,
+      error && h('div', { class: 'err' }, error + ' – Es wird nur die Nummer angezeigt.'),
+      h('div', { class: 'meta' }, c.url && h('span', {}, 'Webseite: ', h('a', { href: normalizeUrl(c.url), target: '_blank', rel: 'noopener' }, c.url.replace(/^https?:\/\//, ''))),
+        h('span', {}, 'Tipp: Für den Scan die Bildschirmhelligkeit hochstellen.')),
+      h('div', { class: 'actions' }, h('button', { class: 'btn danger', onclick: async () => {
+        if (await confirmSheet(`„${c.name}“ löschen?`, 'Die Karte wird von diesem Gerät entfernt.', 'Löschen')) { await DB.del(c.id); cards = cards.filter(x => x.id !== c.id); close(); renderList(); toast('Karte gelöscht.'); }
+      } }, 'Löschen'))));
+  document.body.append(ov); keepAwake(true);
+}
+
+/* ---------- Live-Scanner ---------- */
+async function openScanner(onHit) {
+  let stream, stop = false;
+  const video = h('video', { playsinline: true, muted: true, autoplay: true });
+  const close = () => { stop = true; if (stream) stream.getTracks().forEach(t => t.stop()); ov.remove(); };
+  const msg = h('p', { class: 'hint' }, 'Halte den Barcode oder QR-Code ins Bild …');
+  const ov = h('div', { class: 'overlay scanner', role: 'dialog' },
+    h('div', { class: 'bar' }, h('button', { class: 'textbtn', onclick: close }, 'Abbrechen'), h('h2', {}, 'Scannen'), h('span', { style: 'width:80px' })),
+    h('div', { class: 'content' }, video, msg));
+  document.body.append(ov);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    video.srcObject = stream; await video.play();
+  } catch (e) { msg.textContent = 'Kamera nicht verfügbar: ' + (e.message || e); return; }
+  const det = new BarcodeDetector();
+  const loop = async () => {
+    if (stop) return;
+    try {
+      const res = await det.detect(video);
+      for (const r of res) { const f = FMT_FROM_DETECTOR[r.format]; if (f && r.rawValue) { close(); onHit({ value: r.rawValue, format: f }); return; } }
+    } catch {}
+    setTimeout(loop, 150);
+  };
+  loop();
+}
+
+/* ---------- Editor ---------- */
+function openEditor(card) {
+  const d = card ? { ...card } : { id: uid(), name: '', number: '', display: 'barcode', format: 'code128', url: '', color: '', logo: '', photo: '', design: 'color', created: Date.now() };
+  if (!d.color) d.color = '';
+  const close = () => ov.remove();
+  const root = h('form', { onsubmit: e => e.preventDefault() });
+  const ov = h('div', { class: 'overlay', role: 'dialog' },
+    h('div', { class: 'bar' }, h('button', { class: 'textbtn', type: 'button', onclick: close }, 'Abbrechen'), h('h2', {}, card ? 'Karte bearbeiten' : 'Neue Karte'),
+      h('button', { class: 'textbtn', type: 'button', onclick: save }, 'Sichern')),
+    h('div', { class: 'content' }, root));
+  document.body.append(ov);
+
+  function seg(opts, get, set) {
+    const wrap = h('div', { class: 'seg' });
+    opts.forEach(o => wrap.append(h('button', { type: 'button', class: get() === o.v ? 'on' : '', disabled: o.disabled, onclick: () => { set(o.v); draw(); } }, o.l)));
+    return wrap;
+  }
+  async function pickFile(input) {
+    input.value = ''; input.onchange = async () => {
+      const f = input.files && input.files[0]; if (!f) return;
+      try {
+        const { dataUrl, source } = await processPhoto(f);
+        d.photo = dataUrl; d.design = 'photo';
+        const hit = await detect(source);
+        if (hit) { applyDetected(d, hit); toast('Code im Foto erkannt.'); }
+        else toast(hasDetector() ? 'Kein Code erkannt – bitte Nummer von Hand eintragen.' : 'Foto gespeichert. Auf diesem Gerät ist keine automatische Erkennung verfügbar – bitte Nummer eintragen.', 4500);
+        draw();
+      } catch (e) { toast('Foto konnte nicht verarbeitet werden.', 4000); }
+    };
+    input.click();
+  }
+  function draw() {
+    const sy = ov.scrollTop;
+    root.replaceChildren();
+    // Foto
+    root.append(h('div', { class: 'field' }, h('label', {}, 'Foto der Karte'),
+      h('div', { class: 'btnrow' },
+        h('button', { type: 'button', class: 'btn', onclick: () => pickFile($('#fileCamera')) }, '📷 Foto aufnehmen'),
+        h('button', { type: 'button', class: 'btn', onclick: () => pickFile($('#fileLibrary')) }, '🖼 Aus Mediathek'),
+        h('button', { type: 'button', class: 'btn', disabled: !hasDetector(), onclick: () => openScanner(hit => { applyDetected(d, hit); draw(); toast('Code gescannt.'); }) }, '⌖ Live scannen')),
+      !hasDetector() && h('div', { class: 'hint' }, 'Automatisches Scannen wird von diesem Browser nicht unterstützt. Foto machen und Nummer abtippen geht immer.'),
+      d.photo && h('div', { class: 'photo-prev' }, h('img', { src: d.photo, alt: 'Kartenfoto' }), h('button', { type: 'button', class: 'textbtn danger', onclick: () => { d.photo = ''; d.design = 'color'; draw(); } }, 'Foto entfernen'))));
+    root.append(h('div', { class: 'field' }, h('label', { for: 'f-name' }, 'Name'), h('input', { id: 'f-name', type: 'text', value: d.name, placeholder: 'z. B. dm, Rewe, Payback', autocomplete: 'off', oninput: e => d.name = e.target.value })));
+    root.append(h('div', { class: 'field' }, h('label', { for: 'f-num' }, 'Nummer / Inhalt'), h('input', { id: 'f-num', type: 'text', value: d.number, inputmode: 'text', autocomplete: 'off', oninput: e => { d.number = e.target.value; preview(); } })));
+    root.append(h('div', { class: 'field' }, h('label', {}, 'Anzeige'), seg([{ v: 'number', l: 'Nur Nummer' }, { v: 'qr', l: 'QR-Code' }, { v: 'barcode', l: 'Barcode' }], () => d.display, v => d.display = v)));
+    if (d.display === 'barcode')
+      root.append(h('div', { class: 'field' }, h('label', { for: 'f-fmt' }, 'Barcode-Format'),
+        h('select', { id: 'f-fmt', onchange: e => { d.format = e.target.value; preview(); } }, Object.entries(WCodes.FORMATS).map(([k, f]) => h('option', { value: k, selected: d.format === k }, f.label)))));
+    root.append(h('div', { class: 'field' }, h('div', { id: 'prev' })));
+    root.append(h('div', { class: 'field' }, h('label', { for: 'f-url' }, 'Webseite (optional)'), h('input', { id: 'f-url', type: 'url', value: d.url, placeholder: 'www.beispiel.de', autocapitalize: 'none', oninput: e => d.url = e.target.value })));
+    root.append(h('div', { class: 'field' }, h('label', {}, 'Design der Karte'),
+      seg([{ v: 'photo', l: 'Foto', disabled: !d.photo }, { v: 'color', l: 'Farbe / Logo' }], () => d.design, v => d.design = v),
+      h('div', { class: 'btnrow', style: 'margin-top:10px;align-items:center' },
+        h('input', { type: 'color', value: d.color || '#0f766e', 'aria-label': 'Kartenfarbe', oninput: e => { d.color = e.target.value; } }),
+        h('button', { type: 'button', class: 'btn', id: 'btn-logo', onclick: async e => {
+          const b = e.currentTarget; b.disabled = true; b.textContent = 'Lade …';
+          try { const r = await fetchLogoAndColor(d.url); d.logo = r.logo; if (r.color) d.color = r.color; d.design = 'color'; toast('Logo geladen.'); } catch (err) { toast(err.message, 5500); }
+          draw();
+        } }, 'Logo von Webseite laden')),
+      h('div', { class: 'hint' }, 'Beim Laden des Logos wird die Adresse der Webseite an einen Favicon-Dienst (Google bzw. DuckDuckGo) gesendet. Alles andere bleibt auf deinem Gerät.'),
+      d.logo && h('div', { class: 'photo-prev' }, h('img', { src: d.logo, alt: 'Logo', style: 'width:48px;aspect-ratio:1;object-fit:contain;background:#fff;padding:4px' }), h('button', { type: 'button', class: 'textbtn danger', onclick: () => { d.logo = ''; draw(); } }, 'Logo entfernen'))));
+    preview(); ov.scrollTop = sy;
+  }
+  function preview() {
+    const p = $('#prev', root); if (!p) return; p.replaceChildren();
+    if (d.display === 'number' || !d.number) return;
+    const { box, error } = codeBox(d); p.append(box); if (error) p.append(h('div', { class: 'err' }, error));
+  }
+  async function save() {
+    d.name = (d.name || '').trim(); d.number = (d.number || '').trim();
+    if (!d.name) { toast('Bitte einen Namen eingeben.'); return; }
+    if (d.display !== 'number') { const r = WCodes.render(d.display, d.format, d.number); if (!r.ok) { toast(r.error, 5000); return; } }
+    if (d.design === 'photo' && !d.photo) d.design = 'color';
+    try {
+      await DB.put(d);
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+      cards = await DB.all(); close(); renderList(); toast('Gespeichert.');
+    } catch (e) { toast('Speichern fehlgeschlagen: ' + (e.message || e), 6000); }
+  }
+  draw();
+}
+
+/* ---------- Start ---------- */
+$('#fileImport').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importBackup(f); });
+(async function init() {
+  try { cards = await DB.all(); }
+  catch (e) { $('#app').append(h('div', { class: 'empty' }, h('h2', {}, 'Speicher nicht verfügbar'), h('p', {}, 'Dieser Browser erlaubt kein lokales Speichern (privater Modus?). Öffne OtterCards in einem normalen Fenster.'))); return; }
+  renderList();
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+window.__ottercards = { WCodes, get cards() { return cards; } };
+</script>
+</body>
+</html>
