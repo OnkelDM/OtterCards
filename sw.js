@@ -1,11 +1,18 @@
 /* OtterCards Service Worker – macht die App offline nutzbar.
    Bei jeder Änderung an den Dateien die Versionsnummer erhöhen, damit sich
    alle Geräte beim nächsten Start die neue Version holen. */
-const CACHE = 'ottercards-v1.4.0';
-const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'vendor/barcode-detector.js', 'vendor/zxing_reader.wasm'];
+const CACHE = 'ottercards-v1.5.0';
+const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'];
+// Optionale Dateien: fehlt eine auf dem Server, soll das Update trotzdem klappen.
+const OPTIONAL = ['impressum.html', 'datenschutz.html', 'vendor/LICENSES.txt', 'vendor/barcode-detector.js', 'vendor/zxing_reader.wasm'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })));
+    await Promise.all(OPTIONAL.map(f => c.add(new Request(f, { cache: 'reload' })).catch(() => {})));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', e => {

@@ -68,3 +68,8 @@ Findet die App im Foto keinen Barcode/QR-Code, liest sie die aufgedruckte Nummer
 Die gefundenen Zahlen erscheinen als antippbare Vorschläge unter „Nummer“ – bitte immer mit der Karte vergleichen. Auch der Knopf „Zahl im Foto suchen“ startet die Erkennung.
 Beim ersten Mal wird der Ordner geladen (Internet nötig), danach steht er offline bereit. **Beim Hochladen auf GitHub den ganzen Ordner `vendor` samt `vendor/ocr` mitnehmen.**
 Nach Änderungen: `CACHE` in `sw.js` hochzählen, damit sich die Apps aktualisieren.
+
+
+## Impressum und Datenschutz (ab Version 1.5.0)
+
+`impressum.html` und `datenschutz.html` müssen mit hochgeladen werden. Name und Anschrift stehen in beiden Dateien. Bei Änderungen dort anpassen. Die Seiten sind in der App im Menü und unten in der Liste verlinkt. Die Texte sind eine sorgfältige Vorlage, ersetzen aber keine Rechtsberatung. Ändert sich etwas an der App (z. B. neue Dienste), muss die Datenschutzerklärung angepasst werden.

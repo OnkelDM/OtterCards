@@ -122,6 +122,8 @@ form input[type=color]{width:56px;height:44px;border:1px solid var(--line);borde
 .crophandles i::after{content:'';position:absolute;left:14px;top:14px;width:16px;height:16px;background:#fff;border-radius:50%;box-shadow:0 0 0 3px var(--accent)}
 .crophandles i[data-h=nw]{left:0;top:0}.crophandles i[data-h=n]{left:50%;top:0}.crophandles i[data-h=ne]{left:100%;top:0}.crophandles i[data-h=e]{left:100%;top:50%}
 .crophandles i[data-h=se]{left:100%;top:100%}.crophandles i[data-h=s]{left:50%;top:100%}.crophandles i[data-h=sw]{left:0;top:100%}.crophandles i[data-h=w]{left:0;top:50%}
+.legal{text-align:center;color:var(--muted);font-size:13px;margin:26px 16px 0}
+.legal a{color:var(--muted);text-decoration:underline;padding:6px 4px}
 .hidden{display:none!important}
 </style>
 </head>
@@ -402,7 +404,7 @@ const WCodes = (() => {
 /* =====================================================================
    OtterCards – App
    ===================================================================== */
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const $ = (s, el = document) => el.querySelector(s);
 function h(tag, props, ...kids) {
   const e = document.createElement(tag);
@@ -542,6 +544,7 @@ function renderList() {
       $('#rows-' + CSS.escape(l), app).append(h('button', { class: 'row', onclick: () => openDetail(c.id) }, cardFace(c, true), h('span', { class: 'name' }, c.name), h('span', { class: 'chev' }, '›')));
     }
   }
+  app.append(h('div', { class: 'legal' }, h('a', { href: 'impressum.html' }, 'Impressum'), ' · ', h('a', { href: 'datenschutz.html' }, 'Datenschutz')));
   app.append(h('button', { class: 'fab', 'aria-label': 'Karte hinzufügen', onclick: () => openEditor() }, '+'));
   if (keepSearch) { const q = $('#q'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }
 }
@@ -554,12 +557,16 @@ async function openMenu() {
     { label: 'Backup erstellen (Export)', value: 'export' },
     { label: 'Backup einspielen (Import)', value: 'import' },
     { label: 'Diagnose (Scanner & Zahlenerkennung prüfen)', value: 'diag' },
+    { label: 'Impressum', value: 'imp' },
+    { label: 'Datenschutzerklärung', value: 'dse' },
     { label: 'Alle Daten löschen', value: 'wipe', cls: 'danger' },
     { label: 'Schließen', value: null }] });
   if (v === 'list' || v === 'grid') { settings.view = v; store.set('view', v); renderList(); }
   else if (v === 'export') exportBackup();
   else if (v === 'import') $('#fileImport').click();
   else if (v === 'diag') runDiagnose();
+  else if (v === 'imp') location.href = 'impressum.html';
+  else if (v === 'dse') location.href = 'datenschutz.html';
   else if (v === 'wipe') {
     if (await confirmSheet('Alle Daten löschen?', 'Alle Karten werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden. Erstelle vorher ein Backup, wenn du die Karten behalten willst.', 'Alles löschen')) {
       await DB.clear(); cards = []; renderList(); toast('Alle Daten gelöscht.');
