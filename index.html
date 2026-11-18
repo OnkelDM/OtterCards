@@ -381,7 +381,7 @@ const WCodes = (() => {
 /* =====================================================================
    OtterCards – App
    ===================================================================== */
-const VERSION = '1.2.0';
+const VERSION = '1.2.1';
 const $ = (s, el = document) => el.querySelector(s);
 function h(tag, props, ...kids) {
   const e = document.createElement(tag);
@@ -436,12 +436,12 @@ function toast(msg, ms = 2600) {
   const t = h('div', { class: 'toast', role: 'status' }, msg);
   document.body.append(t); setTimeout(() => t.remove(), ms);
 }
-function sheet({ title, text, items }) {
+function sheet({ title, text, items, extra }) {
   return new Promise(resolve => {
     const close = v => { bg.remove(); resolve(v); };
     const bg = h('div', { class: 'sheet-bg', onclick: e => { if (e.target === bg) close(null); } },
       h('div', { class: 'sheet', role: 'dialog' },
-        title && h('h3', {}, title), text && h('p', {}, text),
+        title && h('h3', {}, title), text && h('p', {}, text), extra,
         items.map(it => h('button', { class: 'item ' + (it.cls || ''), onclick: () => close(it.value) }, it.label))));
     document.body.append(bg);
   });
@@ -533,11 +533,13 @@ async function openMenu() {
     { label: 'Ansicht: Vorschaubilder', value: 'grid', cls: settings.view === 'grid' ? 'on' : '' },
     { label: 'Backup erstellen (Export)', value: 'export' },
     { label: 'Backup einspielen (Import)', value: 'import' },
+    { label: 'Diagnose (Scanner & Zahlenerkennung prüfen)', value: 'diag' },
     { label: 'Alle Daten löschen', value: 'wipe', cls: 'danger' },
     { label: 'Schließen', value: null }] });
   if (v === 'list' || v === 'grid') { settings.view = v; store.set('view', v); renderList(); }
   else if (v === 'export') exportBackup();
   else if (v === 'import') $('#fileImport').click();
+  else if (v === 'diag') runDiagnose();
   else if (v === 'wipe') {
     if (await confirmSheet('Alle Daten löschen?', 'Alle Karten werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden. Erstelle vorher ein Backup, wenn du die Karten behalten willst.', 'Alles löschen')) {
       await DB.clear(); cards = []; renderList(); toast('Alle Daten gelöscht.');
@@ -545,6 +547,24 @@ async function openMenu() {
   }
 }
 
+/* ---------- Diagnose ---------- */
+async function runDiagnose() {
+  const out = [`OtterCards ${VERSION}`, location.href.replace(/[?#].*/, '')];
+  const add = t => out.push(t);
+  add(`Kamera-API: ${navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 'ja' : 'NEIN'} · sicher (https): ${window.isSecureContext ? 'ja' : 'NEIN'}`);
+  add(`WebAssembly: ${typeof WebAssembly === 'object' ? 'ja' : 'NEIN'} · Service Worker: ${navigator.serviceWorker && navigator.serviceWorker.controller ? 'aktiv' : 'nicht aktiv'}`);
+  try { const ks = await caches.keys(); add('Cache: ' + (ks.join(', ') || 'leer')); } catch { add('Cache: nicht lesbar'); }
+  const files = ['vendor/barcode-detector.js', 'vendor/zxing_reader.wasm', 'vendor/ocr/tesseract.min.js', 'vendor/ocr/worker.min.js', 'vendor/ocr/core/tesseract-core-lstm.wasm.js', 'vendor/ocr/core/tesseract-core-simd-lstm.wasm.js', 'vendor/ocr/core/tesseract-core-relaxedsimd-lstm.wasm.js', 'vendor/ocr/lang/eng.traineddata.gz'];
+  for (const f of files) {
+    try { const r = await fetch(f, { cache: 'no-store' }); const n = r.ok ? (await r.arrayBuffer()).byteLength : 0; add(`${r.ok && n > 1000 ? '✓' : '✗'} ${f} (${r.status}, ${Math.round(n / 1024)} KB)`); }
+    catch (e) { add(`✗ ${f} (${e.message || e})`); }
+  }
+  const t = async (name, fn) => { const t0 = performance.now(); try { await fn(); add(`✓ ${name} geladen (${Math.round(performance.now() - t0)} ms)`); } catch (e) { add(`✗ ${name}: ${e && e.message || e}`); } };
+  await t('Barcode-Scanner', getDetector);
+  await t('Zahlenerkennung', getOcr);
+  const box = h('textarea', { readonly: true, style: 'width:100%;height:52vh;font:12px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel);color:inherit' }, out.join('\n'));
+  await sheet({ title: 'Diagnose', text: 'Bitte schick mir diesen Text (zum Kopieren markieren) oder einen Screenshot.', items: [{ label: 'Schließen', value: null }], extra: box });
+}
 /* ---------- Backup ---------- */
 async function exportBackup() {
   if (!cards.length) { toast('Es gibt noch nichts zu sichern.'); return; }
@@ -806,7 +826,7 @@ async function openScanner(onHit) {
     h('div', { class: 'content' }, video, msg));
   document.body.append(ov);
   let det;
-  try { det = await getDetector(); } catch (e) { msg.textContent = 'Der Scanner konnte nicht geladen werden. Du kannst die Nummer auch von Hand eintragen.'; return; }
+  try { det = await getDetector(); } catch (e) { msg.textContent = 'Scanner konnte nicht geladen werden (' + (e.message || e) + '). Menü → Diagnose zeigt mehr. Du kannst die Nummer auch von Hand eintragen.'; return; }
   if (stop) return;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
@@ -849,9 +869,9 @@ function openEditor(card) {
     try {
       const nums = await readNumbers(source);
       ocrCands = nums;
-      if (!nums.length) { toast(scannerFailed ? 'Weder Code noch Zahl erkannt. Bitte Nummer von Hand eintragen.' : 'Weder Code noch Zahl erkannt. Mach das Foto gerade, scharf und ohne Spiegelung – oder trage die Nummer von Hand ein.', 6500); }
+      if (!nums.length) { toast(scannerFailed ? 'Weder Code noch Zahl erkannt (Scanner nicht geladen: ' + (scannerFailed.message || scannerFailed) + '). Bitte Nummer von Hand eintragen.' : 'Weder Code noch Zahl erkannt. Mach das Foto gerade, scharf und ohne Spiegelung – oder trage die Nummer von Hand ein.', 6500); }
       else { chooseNumber(nums[0]); toast(nums.length > 1 ? 'Zahl im Foto gelesen – bitte prüfen. Weitere Vorschläge unter „Nummer“.' : 'Zahl im Foto gelesen – bitte mit der Karte vergleichen.', 6500); }
-    } catch (e) { toast('Die Zahlenerkennung konnte nicht geladen werden (beim ersten Mal ist Internet nötig). Bitte Nummer von Hand eintragen.', 7000); }
+    } catch (e) { toast('Zahlenerkennung fehlgeschlagen: ' + (e && e.message || e) + ' – Menü → Diagnose zeigt mehr.', 9000); }
     draw();
   }
   function chooseNumber(n) { d.number = n; if (d.display === 'number') d.display = 'barcode'; if (d.display === 'barcode') d.format = formatForNumber(n); }
@@ -862,13 +882,13 @@ function openEditor(card) {
       try { photo = await processPhoto(f); } catch (e) { toast('Foto konnte nicht verarbeitet werden.', 4000); return; }
       d.photo = photo.dataUrl; d.design = 'photo'; ocrCands = []; draw();
       toast('Foto gespeichert – suche nach Code …', 8000);
-      let hit = null, scannerOk = true;
-      try { hit = await detectInImage(photo.source); } catch (e) { scannerOk = false; }
+      let hit = null, scannerOk = true, scanErr = null;
+      try { hit = await detectInImage(photo.source); } catch (e) { scannerOk = false; scanErr = e; }
       if (hit && hit.format) { const note = applyDetected(d, hit); toast(note || 'Code im Foto erkannt.', note ? 6500 : 2600); draw(); return; }
       if (hit) { applyDetected(d, hit); }   // Code-Typ nicht nachbaubar: Zahl übernehmen, danach nicht noch Zahlen suchen
       if (hit) { toast(`${hit.label}-Code erkannt. Die Nummer wurde übernommen und wird als Text angezeigt.`, 6500); draw(); return; }
       toast('Kein Code gefunden – lese Zahlen im Foto …', 20000);
-      await findNumbers(photo.source, !scannerOk);
+      await findNumbers(photo.source, scannerOk ? null : scanErr);
     };
     input.click();
   }
@@ -882,7 +902,7 @@ function openEditor(card) {
         h('button', { type: 'button', class: 'btn', onclick: () => pickFile($('#fileLibrary')) }, '🖼 Aus Mediathek'),
         h('button', { type: 'button', class: 'btn', onclick: () => openScanner(hit => { const note = applyDetected(d, hit); draw(); toast(note || 'Code gescannt.', note ? 6500 : 2600); }) }, '⌖ Live scannen')),
       h('div', { class: 'hint' }, 'Tipp: Foto der Karte machen oder live scannen – Barcode bzw. QR-Code wird automatisch gelesen.'),
-      d.photo && h('div', { class: 'photo-prev' }, h('img', { src: d.photo, alt: 'Kartenfoto' }), h('div', { style: 'display:flex;flex-direction:column;align-items:flex-start' }, h('button', { type: 'button', class: 'textbtn', onclick: async () => { toast('Lese Zahlen im Foto …', 20000); const img = new Image(); img.src = d.photo; try { await img.decode(); } catch {} await findNumbers(img, false); } }, '🔢 Zahl im Foto suchen'), h('button', { type: 'button', class: 'textbtn danger', onclick: () => { d.photo = ''; d.design = 'color'; ocrCands = []; draw(); } }, 'Foto entfernen')))));
+      d.photo && h('div', { class: 'photo-prev' }, h('img', { src: d.photo, alt: 'Kartenfoto' }), h('div', { style: 'display:flex;flex-direction:column;align-items:flex-start' }, h('button', { type: 'button', class: 'textbtn', onclick: async () => { toast('Lese Zahlen im Foto …', 20000); const img = new Image(); img.src = d.photo; try { await img.decode(); } catch {} await findNumbers(img, null); } }, '🔢 Zahl im Foto suchen'), h('button', { type: 'button', class: 'textbtn danger', onclick: () => { d.photo = ''; d.design = 'color'; ocrCands = []; draw(); } }, 'Foto entfernen')))));
     root.append(h('div', { class: 'field' }, h('label', { for: 'f-name' }, 'Name'), h('input', { id: 'f-name', type: 'text', value: d.name, placeholder: 'z. B. dm, Rewe, Payback', autocomplete: 'off', oninput: e => d.name = e.target.value })));
     root.append(h('div', { class: 'field' }, h('label', { for: 'f-num' }, 'Nummer / Inhalt'), h('input', { id: 'f-num', type: 'text', value: d.number, inputmode: 'text', autocomplete: 'off', oninput: e => { d.number = e.target.value; preview(); } }),
       ocrCands.length > 0 && h('div', { class: 'hint' }, 'Im Foto gelesene Zahlen – zum Übernehmen antippen:'),
