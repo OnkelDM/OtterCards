@@ -60,3 +60,11 @@ gelöscht oder „Website-Daten“ gelöscht werden oder das Handy gewechselt wi
 - Kein automatisches Zuschneiden der Karte, keine automatische Helligkeit (Webseiten dürfen das nicht).
 - „Logo von Webseite laden“ fragt einen Favicon-Dienst ab (Google, ersatzweise DuckDuckGo).
   Das ist optional und der einzige Moment, in dem die App etwas ins Internet sendet.
+
+
+## Zahl im Foto lesen (ab Version 1.2.0)
+
+Findet die App im Foto keinen Barcode/QR-Code, liest sie die aufgedruckte Nummer per Texterkennung (läuft komplett auf dem Gerät, Ordner `vendor/ocr/`, zusammen ca. 16 MB).
+Die gefundenen Zahlen erscheinen als antippbare Vorschläge unter „Nummer“ – bitte immer mit der Karte vergleichen. Auch der Knopf „Zahl im Foto suchen“ startet die Erkennung.
+Beim ersten Mal wird der Ordner geladen (Internet nötig), danach steht er offline bereit. **Beim Hochladen auf GitHub den ganzen Ordner `vendor` samt `vendor/ocr` mitnehmen.**
+Nach Änderungen: `CACHE` in `sw.js` hochzählen, damit sich die Apps aktualisieren.
