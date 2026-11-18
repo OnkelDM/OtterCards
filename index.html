@@ -583,27 +583,67 @@ async function loadBitmap(file) {
   try { return await createImageBitmap(file); } catch {}
   return await new Promise((res, rej) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = u; });
 }
+function scaledCanvas(bmp, max) {
+  const w0 = bmp.width || bmp.naturalWidth, h0 = bmp.height || bmp.naturalHeight, s = Math.min(1, max / Math.max(w0, h0));
+  const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w0 * s)); cv.height = Math.max(1, Math.round(h0 * s));
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  return cv;
+}
 async function processPhoto(file, max = 1280) {
   const bmp = await loadBitmap(file);
-  const w0 = bmp.width || bmp.naturalWidth, h0 = bmp.height || bmp.naturalHeight, s = Math.min(1, max / Math.max(w0, h0));
-  const cv = document.createElement('canvas'); cv.width = Math.round(w0 * s); cv.height = Math.round(h0 * s);
-  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
-  return { dataUrl: cv.toDataURL('image/jpeg', 0.82), source: bmp };
+  return { dataUrl: scaledCanvas(bmp, max).toDataURL('image/jpeg', 0.82), source: bmp };
 }
-const hasDetector = () => 'BarcodeDetector' in window;
+
+/* ---------- Code-Erkennung (ZXing, lokal aus dem Ordner vendor/) ---------- */
 const FMT_FROM_DETECTOR = { qr_code: 'qr', code_128: 'code128', ean_13: 'ean13', ean_8: 'ean8', upc_a: 'upca', code_39: 'code39', itf: 'itf' };
-async function detect(source) {
-  if (!hasDetector()) return null;
-  try {
-    const det = new BarcodeDetector();
-    const res = await det.detect(source);
-    for (const r of res) { const f = FMT_FROM_DETECTOR[r.format]; if (f && r.rawValue) return { value: r.rawValue, format: f }; }
-  } catch {}
+const OTHER_FORMATS = { upc_e: 'UPC-E', codabar: 'Codabar', data_matrix: 'Data Matrix', pdf417: 'PDF417', aztec: 'Aztec' };
+const DETECT_FORMATS = [...Object.keys(FMT_FROM_DETECTOR), ...Object.keys(OTHER_FORMATS)];
+let detectorPromise = null;
+function getDetector() {
+  if (!detectorPromise) {
+    detectorPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'vendor/barcode-detector.js';
+      s.onload = () => {
+        try {
+          const API = window.BarcodeDetectionAPI;
+          API.prepareZXingModule({ overrides: { locateFile: (p, prefix) => p.endsWith('.wasm') ? 'vendor/zxing_reader.wasm' : prefix + p }, fireImmediately: true });
+          resolve(new API.BarcodeDetector({ formats: DETECT_FORMATS }));
+        } catch (e) { reject(e); }
+      };
+      s.onerror = () => reject(new Error('Scanner-Datei konnte nicht geladen werden.'));
+      document.head.append(s);
+    }).catch(e => { detectorPromise = null; throw e; });
+  }
+  return detectorPromise;
+}
+function pickHit(results) {
+  let other = null;
+  for (const r of results || []) {
+    if (!r.rawValue) continue;
+    const f = FMT_FROM_DETECTOR[r.format];
+    if (f === 'ean13' && /^0\d{12}$/.test(r.rawValue)) return { value: r.rawValue.slice(1), format: 'upca' }; // identische Balken wie UPC-A
+    if (f) return { value: r.rawValue, format: f };
+    if (!other && OTHER_FORMATS[r.format]) other = { value: r.rawValue, format: null, label: OTHER_FORMATS[r.format] };
+  }
+  return other;
+}
+// Foto/Bild: erst in handlicher Größe, bei Misserfolg in höherer Auflösung
+async function detectInImage(source) {
+  const det = await getDetector();
+  const w = source.width || source.naturalWidth || 0, hgt = source.height || source.naturalHeight || 0;
+  for (const max of [1600, 4096]) {
+    if (max > 1600 && Math.max(w, hgt) <= 1600) break;
+    const hit = pickHit(await det.detect(scaledCanvas(source, max)));
+    if (hit) return hit;
+  }
   return null;
 }
 function applyDetected(d, hit) {
   d.number = hit.value;
+  if (!hit.format) { d.display = 'number'; return `${hit.label}-Code erkannt. Die Nummer wurde übernommen, der Code kann aber nicht nachgebaut werden – sie wird als Text angezeigt.`; }
   if (hit.format === 'qr') d.display = 'qr'; else { d.display = 'barcode'; d.format = hit.format; }
+  return null;
 }
 async function fetchLogoAndColor(url) {
   let host; try { host = new URL(normalizeUrl(url)).hostname; } catch { throw new Error('Bitte zuerst eine gültige Webseite eintragen.'); }
@@ -664,23 +704,29 @@ async function openScanner(onHit) {
   let stream, stop = false;
   const video = h('video', { playsinline: true, muted: true, autoplay: true });
   const close = () => { stop = true; if (stream) stream.getTracks().forEach(t => t.stop()); ov.remove(); };
-  const msg = h('p', { class: 'hint' }, 'Halte den Barcode oder QR-Code ins Bild …');
+  const msg = h('p', { class: 'hint' }, 'Scanner wird geladen …');
   const ov = h('div', { class: 'overlay scanner', role: 'dialog' },
     h('div', { class: 'bar' }, h('button', { class: 'textbtn', onclick: close }, 'Abbrechen'), h('h2', {}, 'Scannen'), h('span', { style: 'width:80px' })),
     h('div', { class: 'content' }, video, msg));
   document.body.append(ov);
+  let det;
+  try { det = await getDetector(); } catch (e) { msg.textContent = 'Der Scanner konnte nicht geladen werden. Du kannst die Nummer auch von Hand eintragen.'; return; }
+  if (stop) return;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    if (stop) { stream.getTracks().forEach(t => t.stop()); return; }
     video.srcObject = stream; await video.play();
   } catch (e) { msg.textContent = 'Kamera nicht verfügbar: ' + (e.message || e); return; }
-  const det = new BarcodeDetector();
+  msg.textContent = 'Halte den Barcode oder QR-Code ruhig ins Bild …';
   const loop = async () => {
     if (stop) return;
     try {
-      const res = await det.detect(video);
-      for (const r of res) { const f = FMT_FROM_DETECTOR[r.format]; if (f && r.rawValue) { close(); onHit({ value: r.rawValue, format: f }); return; } }
+      if (video.readyState >= 2) {
+        const hit = pickHit(await det.detect(video));
+        if (hit && !stop) { close(); onHit(hit); return; }
+      }
     } catch {}
-    setTimeout(loop, 150);
+    setTimeout(loop, 120);
   };
   loop();
 }
@@ -705,14 +751,16 @@ function openEditor(card) {
   async function pickFile(input) {
     input.value = ''; input.onchange = async () => {
       const f = input.files && input.files[0]; if (!f) return;
+      let photo;
+      try { photo = await processPhoto(f); } catch (e) { toast('Foto konnte nicht verarbeitet werden.', 4000); return; }
+      d.photo = photo.dataUrl; d.design = 'photo'; draw();
+      toast('Foto gespeichert – suche nach Code …', 8000);
       try {
-        const { dataUrl, source } = await processPhoto(f);
-        d.photo = dataUrl; d.design = 'photo';
-        const hit = await detect(source);
-        if (hit) { applyDetected(d, hit); toast('Code im Foto erkannt.'); }
-        else toast(hasDetector() ? 'Kein Code erkannt – bitte Nummer von Hand eintragen.' : 'Foto gespeichert. Auf diesem Gerät ist keine automatische Erkennung verfügbar – bitte Nummer eintragen.', 4500);
-        draw();
-      } catch (e) { toast('Foto konnte nicht verarbeitet werden.', 4000); }
+        const hit = await detectInImage(photo.source);
+        if (hit) { const note = applyDetected(d, hit); toast(note || 'Code im Foto erkannt.', note ? 6500 : 2600); }
+        else toast('Kein Code erkannt. Mach das Foto gerade, scharf und ohne Spiegelung – oder trage die Nummer von Hand ein.', 6500);
+      } catch (e) { toast('Der Scanner konnte nicht geladen werden. Bitte Nummer von Hand eintragen.', 6000); }
+      draw();
     };
     input.click();
   }
@@ -724,8 +772,8 @@ function openEditor(card) {
       h('div', { class: 'btnrow' },
         h('button', { type: 'button', class: 'btn', onclick: () => pickFile($('#fileCamera')) }, '📷 Foto aufnehmen'),
         h('button', { type: 'button', class: 'btn', onclick: () => pickFile($('#fileLibrary')) }, '🖼 Aus Mediathek'),
-        h('button', { type: 'button', class: 'btn', disabled: !hasDetector(), onclick: () => openScanner(hit => { applyDetected(d, hit); draw(); toast('Code gescannt.'); }) }, '⌖ Live scannen')),
-      !hasDetector() && h('div', { class: 'hint' }, 'Automatisches Scannen wird von diesem Browser nicht unterstützt. Foto machen und Nummer abtippen geht immer.'),
+        h('button', { type: 'button', class: 'btn', onclick: () => openScanner(hit => { const note = applyDetected(d, hit); draw(); toast(note || 'Code gescannt.', note ? 6500 : 2600); }) }, '⌖ Live scannen')),
+      h('div', { class: 'hint' }, 'Tipp: Foto der Karte machen oder live scannen – Barcode bzw. QR-Code wird automatisch gelesen.'),
       d.photo && h('div', { class: 'photo-prev' }, h('img', { src: d.photo, alt: 'Kartenfoto' }), h('button', { type: 'button', class: 'textbtn danger', onclick: () => { d.photo = ''; d.design = 'color'; draw(); } }, 'Foto entfernen'))));
     root.append(h('div', { class: 'field' }, h('label', { for: 'f-name' }, 'Name'), h('input', { id: 'f-name', type: 'text', value: d.name, placeholder: 'z. B. dm, Rewe, Payback', autocomplete: 'off', oninput: e => d.name = e.target.value })));
     root.append(h('div', { class: 'field' }, h('label', { for: 'f-num' }, 'Nummer / Inhalt'), h('input', { id: 'f-num', type: 'text', value: d.number, inputmode: 'text', autocomplete: 'off', oninput: e => { d.number = e.target.value; preview(); } })));
